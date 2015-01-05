@@ -7,19 +7,19 @@ from themidibus import MidiBus
 from processing.video import Capture
 
 webcamlist = Capture.list()
-
-for j, i in enumerate(webcamlist):
-    print("{} {}".format(j, i))
+#for j, i in enumerate(webcamlist):
+#    print("{} {}".format(j, i))
 cam = Capture(this, webcamlist[1])
 
 width = 640
 height = 320
 x = 0
 fps = 30
-minim = 83
+minim = 0
 threshold = 0
 deltax = 11
 tempo = 1
+poster = 5
 octave = 4
 nobg = False
 
@@ -27,16 +27,16 @@ filename = "imagen.jpg"
 #filename = "webcam"
 log = []
 
-miditones = [1, 3, 6, 8, 10]  #pentatonic scale
-miditones70 = [1,3,6,8,10,13,15,18,20,22,25, 27,30,32,34,37,39,42,44,46,49,51,54,56,58,61,63,66,68,70]
+#miditones = [1, 3, 6, 8, 10]  #pentatonic scale
+miditones = [1,3,6,8,10,13,15,18,20,22,25, 27,30,32,34,37,39,42,44,46,49,51,54,56,58,61,63,66,68,70]
 graytones = {}          # dict containing {miditone: graytone}
 colordict = {}          # dict containing {color: nthresholder of pixels with this color}
 sendnotesdict = {}      # dict containing {notes: velocity}
-oldsendnotesdict = {}   # a copy of previous frame calculation
 oldcolordict = {}       # a copy of previous frame calculation
 cdict = {}
+colors = {} # colors[i]: colordict[i]-oldcolordict[i]
 
-MidiBus.list()
+#MidiBus.list()
 myBus = MidiBus(this, "VirMIDI [hw:2,0,0]", "VirMIDI [hw:2,0,0]")
 
 def drawbackground(filename):
@@ -44,12 +44,12 @@ def drawbackground(filename):
         if cam.available() == True:
             cam.read()
             cam.filter(GRAY)
-            cam.filter(POSTERIZE, 5)
+            cam.filter(POSTERIZE, poster)
             image(cam, 0, -142)
     else:
         img = loadImage(filename)
         img.filter(GRAY)
-        img.filter(POSTERIZE, 5)
+        img.filter(POSTERIZE, poster)
         #background(img)
         image(img, 0, 0, 640, 320)
 
@@ -95,9 +95,9 @@ def generate_a():
             colordict[c] = 0
 
     # generate graytones
+    graytones = {}
     sorted_colors = colorlist
     sorted_colors.sort()
-    # generate graytones
     for i, j in enumerate(sorted_colors):
         try:
             graytones[miditones[i]] = j
@@ -110,8 +110,7 @@ def generate_a():
 def generate_c():
     global x
     global cdict
-
-    #colordict = {}
+    global colordict
 
     colorlist = colordict.keys()
     # generate colordict
@@ -123,7 +122,7 @@ def generate_c():
             else:
                 colordict[c] += 1
     # adding unfounded colors to dict
-    for c in oldcolordict.keys():
+    for c in graytones.values():
         if c not in colordict.keys():
             colordict[c] = 0
    
@@ -133,13 +132,14 @@ def printdata():
     global miditones
     global graytones
     global nobg
-    print("________________:"+str(nobg)+" "+str(tempo))
-    print("    oldcolordict: "+sorted_dict2(oldcolordict))
-    print("       colordict: "+sorted_dict2(colordict))
-    print("___sendnotesdict: "+sorted_dict2(sendnotesdict))
-    print("oldsendnotesdict: "+sorted_dict2(oldsendnotesdict))
-    print("____   graytones: "+sorted_dict2(graytones))
-    print("____   cdict: "+sorted_dict2(cdict))
+    print("________________x"+str(x)+" "+str(nobg)+" "+str(tempo))
+    print("    oldcolordict[gray]: "+sorted_dict(oldcolordict))
+    print("       colordict[gray]: "+sorted_dict(colordict))
+    print("_______   colors[gray]: "+sorted_dict(colors))
+    print("___sendnotesdict[note]: "+sorted_dict2(sendnotesdict))
+    print("graytones[note]:[gray]: "+sorted_dict2(graytones))
+    print("           cdict[gray]: "+sorted_dict(cdict))
+    
     i = len(log)-1
     if i > -1:
         print("x:{} octave:{} miditones:{}".format(log[i][0], log[i][1], log[i][2]))
@@ -164,118 +164,135 @@ def sendnote(chan, pitch, vel):
     myBus.sendNoteOff(chan, pitch, vel)
     myBus.sendNoteOn(chan, pitch, vel)
 
+def calculate_colors():
+    global colors
+
+    lista = colordict.keys()
+    lista.sort()
+
+    colors = {}
+    for i in lista:
+        try:
+            colors[i] = abs(colordict[i] - oldcolordict[i])
+        except KeyError:
+            pass
+
 def calculate_sendnotesdict():
     global cdict
+    global sendnotesdict
+
+    calculate_colors()
     
     cdict = {}
     # copy colordict for calculations
-    for i in colordict.keys():
-        cdict[i] = colordict[i]
+    for i in colors.keys():
+        cdict[i] = colors[i]
     
     # apply bg rule
     if nobg == True:
         cdict[255] = 0
 
-    #detect higher value color
-    maximum = 0
-    for i in colordict.values():
+    #detect maximum (higher pixels values)
+    maximum = 1
+    for i in colors.values():
         if i > maximum:
             maximum = i
-    #
-    lista = cdict.keys()
+    
+    lista = colors.keys()
     lista.sort()
     # map values in colordict to 0-127            
     for j, i in enumerate(lista):
-        try:
-            nota = miditones[j]
-        except IndexError:
-            #print("es un error", lista)
-            nota = 1
-            pass
-        gray = graytones[nota]
+        gray = i
+        nota = miditones[j]
+        colordif = colors[gray]
         #print(nota,gray, colordict[i], maximum)
-        try:
-            cdict[i] = int(map(colordict[i], 0, maximum, 0, 127))
-        except ValueError:
-            cdict[i] = 0
+        cdict[i] = int(map(colordif, 0, maximum, 0, 127))
+        
         # apply minim and threshold filters
-        if cdict[i] < minim:
+        if colordif < minim:
             cdict[i] = 0
-        #print(".......", i)
-        #print(abs(colordict[gray]-oldcolordict[gray]))
-        if abs(colordict[gray]-oldcolordict[gray]) < threshold:
+        if colordif < threshold:
             cdict[i] = 0
 
     # generate new dict with tones to send midi
-    lista = cdict.keys()
+    lista = colors.keys()
     lista.sort()
+    sendnotesdict = {}
     for j, i in enumerate(lista):
-        try:
+        if cdict[i] != 0:
             nota = miditones[j]
-        except IndexError:
-            nota = 1
-            #print("exception", lista)
-            pass
-        sendnotesdict[nota] = cdict[i]
+            sendnotesdict[nota] = cdict[i]
     
     for k, v in sendnotesdict.iteritems():
-        if v != 0:
+        if v != 0 and x != 0:
             sendnote(0, k + 12 * octave, v)
-            #print("NOTAAAAAAAAA", k, v)
+            #print("notaaaa-----{} {}".format(k + 12 * octave, v))
+
+def createlog():
+    global log
+    # create a log
+    notedict = {}
+    for i in sendnotesdict.keys():
+        notedict[i] = sendnotesdict[i]
+    log.append((x, octave ,notedict))
+
+def updatedicts():
+    global oldcolordict
+    # store old colordict and reset colordict
+    for i in colordict.keys():
+        oldcolordict[i] = colordict[i]
 
 #............................................SETUP
 def setup():
     # setup
     size(width, height+137)
     frameRate(fps)
-    # draw
     drawbackground(filename)
-    # calculate color dicts
     generate_a()
+
+
 
 #............................................DRAW
 def draw():
-    global oldcolordict
-    global oldsendnotesdict
+    global colordict
     global x
     global log
     
-    # draw
-    #if len(log) == 0:
-    #    drawbackground(filename)
-    
-    drawtimeline()
-    #printdata()
-    drawgui()
-    # calculate selected notes with rules
-    if x%deltax == 0:
-        print("---------{}---------------".format(filename))
+    if len(log) == 0:
         drawbackground(filename)
-        # calculate new color dict
-        generate_c()
-        calculate_sendnotesdict()
-        # store old send notes and log
-        for i in sendnotesdict.keys():
-            oldsendnotesdict[i] = sendnotesdict[i]
-        # create a notedictator to store
-        notedict = {}
-        for i in miditones:
-            notedict[i] = sendnotesdict[i]
-        log.append((x, octave ,notedict))
-        # store old colordict and reset colordict
-        for i in colordict.keys():
-            oldcolordict[i] = colordict[i]
-        #printdata()
-        drawlog()
 
+              
+
+    generate_c()
+    drawtimeline()    
+
+    if x%deltax == 0:
+        print("---{}------{}------{}".format(x, filename, sorted_dict(sendnotesdict)))
+        
+        drawbackground(filename)
+        calculate_sendnotesdict()
+        drawgui()
+        
+        createlog()
+        drawlog()
+        printdata()
+        
+
+    drawfastgui()
+    drawknobs()
+    if x%deltax == 0:
+        for i in colordict.keys():
+            colordict[i] = 0
+    updatedicts()
     # move to next pixel column
     x = x + 1*tempo
     if x > width - width%deltax:
         x = 0
-        log = []
-
+        log = [] 
     #print(x, x/deltax, (x/deltax)*deltax)
 
+def drawknobs():
+    print("EAAAAAAA")
 
 
 def drawtimeline():
@@ -283,7 +300,7 @@ def drawtimeline():
     # labels background
     noStroke()
     fill(60,22,0)
-    rect(0,322, 640, 15)
+    rect(0,322, 640, 30)
     # current frame marker
     fill(240,90,0)
     rect(x-1,322, 3, 15)
@@ -298,120 +315,125 @@ def drawtimeline():
     text(label2, 320, 333)
     text(label3, 480, 333)
     
+def drawfastgui():
+    lista = graytones.values()
+    lista.sort()
+
+    rectwidth = width / len(lista)
+    rectheight = 335 + (127/2)
+    
+    for j, i in enumerate(lista):
+        # draw gray scale boxes
+        gray = i
+        nota = miditones[j]
+        try:
+            colordif = abs(colordict[gray]-oldcolordict[gray])
+        except KeyError:
+            colordif = 0
+        
+        fill(255,255,0)
+        stroke(255,225,0)
+        label1 = "{}".format(colordif, colordict[i])
+        textSize(15)
+        text(label1, rectwidth*j, rectheight-50) 
 
 def drawgui():
+    calculate_colors()
 
-    #printdata()
-    #    
-    # draw circles with notes:
-    lista = colordict.keys()
+    lista = colors.keys()
     lista.sort()
-    
-    maxim = 0
-    for i in lista: 
-        if colordict[i] > maxim: 
-            maxim = colordict[i]
-    if maxim == 0:
-        maxim = 1
-    #print("maximo", maxim)
 
     rectwidth = width / len(lista)
     rectheight = 335 + (127/2)
 
-    lista = colordict.keys()
-    lista.sort()
+    maxim = 1
+    for i in lista:
+        try:
+            if colors[i] > maxim: 
+                maxim = colors[i]
+        except KeyError:
+            pass
         
     for j, i in enumerate(lista):
         # draw gray scale boxes
-        fill(i+20,i+20,i+20)
+        gray = i
+        nota = miditones[j]
+        
+        try:
+            lastvel = sendnotesdict[nota]
+            colordif = colors[gray]
+        except KeyError:
+            colordif = 0
+            lastvel = 0
+        
+        fill(gray+20,gray+20,gray+20)
         noStroke()
-        rect(rectwidth*j, 335, 640/5, 127)
+        rect(rectwidth*j, 335, 640/len(lista), 127)
         # draw each circle
-        stroke(0)
-        radius = int(map(colordict[i], 0, maxim, 0, rectwidth))
-        if i==255 and nobg==True:
-            radius = 0
-        fill(i)
-        stroke(255-i)
+        radius = int(map(colordif, 0, maxim, 0, rectheight/4))
+        fill(gray)
         ellipse(rectwidth*j+rectwidth/2, rectheight, radius, radius)
         # if radius == 0:
-        if colordict[i] == 0 or (i==255 and nobg==True): 
+        if radius == 0: 
             stroke(240,90,0)
             fill(0)
             line((rectwidth*j+rectwidth/2)-10, rectheight-10,(rectwidth*j+rectwidth/2)+10, rectheight+10)
             line((rectwidth*j+rectwidth/2)+10, rectheight-10,(rectwidth*j+rectwidth/2)-10, rectheight+10)
         
-        try:
-            try:
-                nota = miditones[j]
-            except IndexError:
-                nota = 1
-            label1 = "{}:".format(str(nota + 12 * octave))
-            label2 = " {}".format(sendnotesdict[nota])
-            if sendnotesdict[nota] == 0:
-                label2 = ""
-                label1 = ""
-        except KeyError:
-            label1 = "@"
-            label2 = "@@"
-        #shadow
-        fill(0, 0, 0)
-        textSize(15)
-        text(label1, rectwidth*j+2, rectheight+2)
-        textSize(28)
-        text(label2, rectwidth*j+2, rectheight+52)
-        #yellow titles
-        fill(255, 190, 0)
+        label1 = "{}:{}".format(nota, str(nota + 12 * octave))
+        label2 = "{}".format(lastvel)
+
+        if lastvel == 0:
+            fill(100,0,0)
+        else:
+            fill(255, 190, 0)
         textSize(15)
         text(label1, rectwidth*j, rectheight+0)
         textSize(28)
         text(label2, rectwidth*j, rectheight+50)
+        fill(0, 190, 0)
 
 def drawlog():
-    
-    #
     # fade left side
     noStroke()
     fill(120,45,0,80)
     rect(0, -1, (x/deltax)*deltax - 2, 337)
     # # fade right side
-    rect((x/deltax)*deltax+deltax + 2, 0, width-(x/deltax)*deltax + 3, 337)
+    #dx = x + 1*tempo
+    #dx = ((x/deltax)*deltax+deltax + 2)*tempo
+    #rect(dx, 0, width-(x/deltax)*deltax + 3, 337)
     
     # draw log notes
     if log != []:
         for i in log:
             ix = i[0]
             ioctave = i[1]
+            imiditones = {}
             imiditones = i[2]
-            lista = sendnotesdict.keys()
+            lista = imiditones.keys()
             lista.sort()
             for k, j in enumerate(lista):
-                nota = miditones[k]
-                try:
-                    value = imiditones[j]
-                except IndexError:
-                    value = 0
-                for color in graytones.keys():
-                    if color == nota:
-                        fill(graytones[color]) 
-                
+                nota = j
+                value = imiditones[j]
                 base = ix - deltax - 3
-                basey = k + 12 * ioctave
+                basey = nota + 12 * ioctave
                 val = int(map(value, 0, 127, 0, deltax))
-                noStroke()
-                rect(base, basey + 12 * k, val, 12)
+                try:
+                    fill(graytones[nota]) 
+                    noStroke()
+                    rect(base, basey + 12 * k, val, 12)
+                except KeyError:
+                    pass
     
 
 
 def keyPressed():
-    # global colordict
-    # global oldcolordict
-    # global graytones
     global deltax
     global x
     global minim
     global threshold
     global tempo
+    global poster
     global octave
     global filename
     global nobg
@@ -423,21 +445,16 @@ def keyPressed():
             x = 0
             # draw
             drawbackground(filename)
-            # calculate color dicts
             generate_a()
         if key == "2":
             filename = "viso_del_marques_peque.jpg"
             x = 0
-            # draw
             drawbackground(filename)
-            # calculate color dicts
             generate_a()
         if key == "3":
             filename = "prueba_vacio.jpg"
             x = 0
-            # draw
             drawbackground(filename)
-            # calculate color dicts
             generate_a()
         if key == "4":
             filename = "webcam"
@@ -478,11 +495,38 @@ def keyPressed():
             if minim < 0:
                 minim = 0
         if key == ".":
-            tempo += 1
+            poster += 1
+            if poster > 50:
+                poster = 50
+            x = 0
+            # draw
+            drawbackground(filename)
+            # calculate color dicts
+            generate_a()
         if key == ",":
+            poster -= 1
+            if poster < 2:
+                poster = 2
+            x = 0
+            # draw
+            drawbackground(filename)
+            # calculate color dicts
+            generate_a()
+        if key == "c":
+            tempo += 1
+            # draw
+            drawbackground(filename)
+            # calculate color dicts
+            generate_a()
+        if key == "x":
             tempo -= 1
             if tempo < 1:
                 tempo = 1
+            x = 0
+            # draw
+            drawbackground(filename)
+            # calculate color dicts
+            generate_a()
 
     if key == CODED:
         if keyCode == RIGHT:
