@@ -15,8 +15,22 @@ You also need to install some libraries in your py-processing installation:
 https://processing.org/reference/libraries/video/index.html
 http://www.smallbutdigital.com/themidibus.php
 
+How to make it sound!!
+===============
 
-When running the app you have to change values in line 11 and 12
+This app only generate MIDI pulses, if you want to hear it, you need to plug the output into a sound synthetizer...
+
+In linux, you need to run this command to create a virtual midi device (Virtual-Raw-MIDI):
+
+sudo modprobe snd-virmidi
+
+Then you can run Qjackctl and connect Virtual-Raw-MIDI OUT to MidiThrough IN and MidiThrough OUT to your preferred synth (ie: amsynth, qsynth, zynaddsubfx). 
+
+You can connect more than one devices...
+
+When running the app for the forst time, two device lists will be printed to let you choose how to configure midi and webcam 
+
+--> Change values in line 11 and 14.
 
 
 Visual to Midi Synth
