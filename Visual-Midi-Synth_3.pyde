@@ -37,7 +37,7 @@ cdict = {}
 colors = {} # colors[i]: colordict[i]-oldcolordict[i]
 
 #MidiBus.list()
-myBus = MidiBus(this, "VirMIDI [hw:2,0,0]", "VirMIDI [hw:2,0,0]")
+myBus = MidiBus(this, "VirMIDI [hw:4,0,0]", "VirMIDI [hw:4,0,0]")
 
 def drawbackground(filename):
     if filename == "webcam":
@@ -116,7 +116,7 @@ def generate_c():
     # generate colordict
     for i in range(tempo):
         for y1 in range(height):
-            c = int(brightness(get(x + tempo, y1)))   # change x :   x + i
+            c = int(brightness(get(x + i, y1)))   # change x :   x + i
             if c not in colordict.keys():
                 colordict[c] = 1
             else:
@@ -177,6 +177,15 @@ def calculate_colors():
         except KeyError:
             pass
 
+    # apply bg rule
+    if nobg == True:
+        #detect maximum gray
+        maxgray = 0
+        for i in colors.values():
+            if i > maxgray:
+                maxgray = i
+        colors[maxgray] = 0
+
 def calculate_sendnotesdict():
     global cdict
     global sendnotesdict
@@ -187,10 +196,6 @@ def calculate_sendnotesdict():
     # copy colordict for calculations
     for i in colors.keys():
         cdict[i] = colors[i]
-    
-    # apply bg rule
-    if nobg == True:
-        cdict[255] = 0
 
     #detect maximum (higher pixels values)
     maximum = 1
@@ -289,14 +294,13 @@ def draw():
     if x > width - width%deltax:
         x = 0
         log = [] 
-    #print(x, x/deltax, (x/deltax)*deltax)
+    #print("----------",x, x/deltax, (x/deltax)*deltax)
 
 def drawknobs():
-    print("EAAAAAAA")
-
+    #print("Knobs y sliders!!!!")
+    pass
 
 def drawtimeline():
-    #
     # labels background
     noStroke()
     fill(60,22,0)
@@ -308,12 +312,10 @@ def drawtimeline():
     # draw variables labels
     fill(220)
     textSize(14)
-    label1 = "min(v/b):" + str(minim) + " threshold(n/m): " + str(threshold)
-    label2 = " octave(up/down): " + str(octave)
-    label3 = " deltax (left/right):" + str(deltax)
+    label1 = "min(v/b):" + str(minim) + "  threshold(n/m): " + str(threshold)
+    label1 += "   tempo(x/c): " + str(tempo) + "  octave(up/down): " + str(octave)
+    label1 += "   deltax (left/right):" + str(deltax)
     text(label1, 10, 333)
-    text(label2, 320, 333)
-    text(label3, 480, 333)
     
 def drawfastgui():
     lista = graytones.values()
@@ -398,10 +400,12 @@ def drawlog():
     noStroke()
     fill(120,45,0,80)
     rect(0, -1, (x/deltax)*deltax - 2, 337)
+
     # # fade right side
-    #dx = x + 1*tempo
-    #dx = ((x/deltax)*deltax+deltax + 2)*tempo
-    #rect(dx, 0, width-(x/deltax)*deltax + 3, 337)
+    dx = (x/deltax)*deltax + deltax*tempo + 4
+    #size = width-(x/deltax)*deltax + 3
+    size = width-dx
+    rect(dx, 0, size, 337)
     
     # draw log notes
     if log != []:
@@ -415,14 +419,16 @@ def drawlog():
             for k, j in enumerate(lista):
                 nota = j
                 value = imiditones[j]
-                base = ix - deltax - 3
+                basex = ix - deltax - 3
                 basey = nota + 12 * ioctave
                 val = int(map(value, 0, 127, 0, deltax))
+                if val > 0: val += 1
                 try:
                     fill(graytones[nota]) 
                     noStroke()
-                    rect(base, basey + 12 * k, val, 12)
+                    rect(basex, basey + 12 * nota, val, 12)
                 except KeyError:
+                    print("keyerror en draw log... {}".format(nota, graytones))
                     pass
     
 
