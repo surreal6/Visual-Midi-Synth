@@ -374,10 +374,6 @@ def drawgui():
         noStroke()
         rect(rectwidth*j, 335, 640/len(lista), 127)
         
-        # if j == len(lista)-1:
-        # 	fill(240,120,0,50)
-        # 	rect(0,335,640,127)
-      
         # draw each circle
         stroke(border)
         radius = int(map(colordif, 0, maxim, 0, rectheight/4))
