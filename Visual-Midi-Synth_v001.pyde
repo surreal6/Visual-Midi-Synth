@@ -3,13 +3,15 @@
 # sudo modprobe snd-virmidi
 from themidibus import MidiBus
 
-#add_library('video')
 from processing.video import Capture
 
 webcamlist = Capture.list()
-#for j, i in enumerate(webcamlist):
-#    print("{} {}".format(j, i))
+for j, i in enumerate(webcamlist):
+    print("{} {}".format(j, i))
 cam = Capture(this, webcamlist[1])
+
+#MidiBus.list()
+myBus = MidiBus(this, "VirMIDI [hw:4,0,0]", "VirMIDI [hw:4,0,0]")
 
 width = 640
 height = 320
@@ -18,7 +20,7 @@ fps = 30
 minim = 0
 threshold = 0
 deltax = 11
-tempo = 1
+tempo = 1.00
 poster = 5
 octave = 4
 nobg = False
@@ -35,9 +37,6 @@ sendnotesdict = {}      # dict containing {notes: velocity}
 oldcolordict = {}       # a copy of previous frame calculation
 cdict = {}
 colors = {} # colors[i]: colordict[i]-oldcolordict[i]
-
-#MidiBus.list()
-myBus = MidiBus(this, "VirMIDI [hw:4,0,0]", "VirMIDI [hw:4,0,0]")
 
 def drawbackground(filename):
     if filename == "webcam":
@@ -114,6 +113,7 @@ def generate_c():
 
     colorlist = colordict.keys()
     # generate colordict
+    
     for i in range(tempo):
         for y1 in range(height):
             c = int(brightness(get(x + i, y1)))   # change x :   x + i
@@ -262,14 +262,15 @@ def draw():
     global colordict
     global x
     global log
-    
+
     if x == 0:
     	drawbackground(filename)
     generate_c()
     drawtimeline()    
 
     if x%deltax == 0:
-        print("---{}------{}------{}".format(x, filename, sorted_dict(sendnotesdict)))
+    	print("---{}------{}------{}".format(x, filename, sorted_dict(sendnotesdict)))
+        
         drawbackground(filename)
         calculate_sendnotesdict()
         drawgui()
@@ -277,7 +278,6 @@ def draw():
         createlog()
         drawlog()
         printdata()
-        
 
     drawfastgui()
     drawknobs()
@@ -289,7 +289,11 @@ def draw():
     x = x + 1*tempo
     if x > width - width%deltax:
         x = 0
-        log = [] 
+        log = []
+    max_x = deltax*(width/deltax)
+    if x > max_x:
+    	x = 0
+    	log = []
     #print("----------",x, x/deltax, (x/deltax)*deltax)
 
 def drawknobs():
@@ -334,6 +338,10 @@ def drawfastgui():
         label1 = "{}".format(colordif, colordict[i])
         textSize(15)
         text(label1, rectwidth*j, rectheight-50) 
+
+    fill(255,0,0,75)
+    stroke(255,0,0,75)
+    line(x, 0, x, height)
 
 def drawgui():
     calculate_colors()
@@ -406,7 +414,7 @@ def drawlog():
     rect(0, 0, (x/deltax)*deltax, 337)
 
     # # fade right side
-    dx = (x/deltax)*deltax + deltax*tempo + 1
+    dx = (x/deltax)*deltax + deltax*tempo + 2
     size = width-dx
     rect(dx, 0, size, 337)
     
@@ -522,17 +530,14 @@ def keyPressed():
             # calculate color dicts
             generate_a()
         if key == "c":
-            tempo += 1
+            tempo = tempo*2
             x = 0
             # draw
             drawbackground(filename)
             # calculate color dicts
             generate_a()
         if key == "x":
-            tempo -= 1
-            if tempo < 1:
-                tempo = 1
-            x = 0
+            tempo = tempo/2
             # draw
             drawbackground(filename)
             # calculate color dicts

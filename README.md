@@ -16,6 +16,8 @@ https://processing.org/reference/libraries/video/index.html
 http://www.smallbutdigital.com/themidibus.php
 
 
+When running the app you have to change values in line 11 and 12
+
 
 Visual to Midi Synth
 ------------------
@@ -36,3 +38,5 @@ n/m 		threshold
 ,/. 		posterize
 up/down 	octave
 left/right 	deltax
+
+if you change tempo you can expect lots of inestability...
