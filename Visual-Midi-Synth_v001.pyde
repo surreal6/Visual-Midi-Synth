@@ -1,6 +1,11 @@
 # first of all, you should execute this command 
 # to create a virtual midi device in the system
 # sudo modprobe snd-virmidi
+
+# instalar:
+# sudo apt-get install gstreamer0.10 libgstreamer-plugins-base0.10-dev
+#
+
 from themidibus import MidiBus
 
 from processing.video import Capture
@@ -11,7 +16,7 @@ for j, i in enumerate(webcamlist):
 cam = Capture(this, webcamlist[1])
 
 #MidiBus.list()
-myBus = MidiBus(this, "VirMIDI [hw:4,0,0]", "VirMIDI [hw:4,0,0]")
+myBus = MidiBus(this, "VirMIDI [hw:2,0,0]", "VirMIDI [hw:2,0,0]")
 
 width = 640
 height = 320
